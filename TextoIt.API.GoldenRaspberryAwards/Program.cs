@@ -1,8 +1,13 @@
+using TextoIt.API.GoldenRaspberryAwards;
+using TextoIt.API.GoldenRaspberryAwards.Models;
+using TextoIt.API.GoldenRaspberryAwards.Repository;
+
 var builder = WebApplication.CreateBuilder(args);
+CustomStartup customStartUp = new CustomStartup();
 
 // Add services to the container.
-
 builder.Services.AddControllers();
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -21,5 +26,7 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
+
+customStartUp.StartUp();
 
 app.Run();
