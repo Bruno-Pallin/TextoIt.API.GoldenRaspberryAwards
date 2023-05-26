@@ -38,10 +38,17 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
                     return BadRequest("Please, to update a movie, you need to fill the mandatory fields: year (higher than 1850) and title.");
 
                 string selectQuery = $"SELECT * FROM MoviesGoldenRaspberryAwards WHERE year={movie.year} AND title='{movie.title}'";
-                MoviesModel? movieReturned = _moviesDAO.Read(selectQuery);
+                List<MoviesModel> movieReturned = _moviesDAO.Read(selectQuery);
 
-                IActionResult response = Ok(movieReturned);
-                if (movieReturned == null) response = NotFound($"Movie not found in database.");
+                IActionResult response;
+                if (movieReturned.Count > 0)
+                {
+                    response = Ok(movieReturned[0]);
+                }
+                else
+                {
+                    response = NotFound($"Movie not found in database.");
+                }
 
                 return response;
             }
@@ -126,8 +133,8 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
                 if (httpReturnStatus == 404) return NotFound($"Movie not found in database.");
 
                 string selectQuery = $"SELECT * FROM MoviesGoldenRaspberryAwards WHERE year={movie.year} AND title='{movie.title}'";
-                MoviesModel? movieUpdated = _moviesDAO.Read(selectQuery);
-                return Ok(movieUpdated);
+                List<MoviesModel> movieUpdated = _moviesDAO.Read(selectQuery);
+                return Ok(movieUpdated[0]);
             }
             catch (Exception)
             {

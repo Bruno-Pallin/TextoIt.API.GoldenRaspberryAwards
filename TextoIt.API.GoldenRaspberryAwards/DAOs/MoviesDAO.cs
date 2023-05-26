@@ -40,11 +40,11 @@ namespace TextoIt.API.GoldenRaspberryAwards.Repository
             }
         }
 
-        public MoviesModel? Read(string selectQuery)
+        public List<MoviesModel> Read(string selectQuery)
         {
             try
             {
-                MoviesModel movie;
+                List<MoviesModel>? movieList = new List<MoviesModel>();
 
                 using (_connection)
                 {
@@ -56,18 +56,20 @@ namespace TextoIt.API.GoldenRaspberryAwards.Repository
 
                         while (reader.Read())
                         {
-                            movie = new MoviesModel(reader.GetInt32("year"), reader.GetString("title"), reader.GetString("studio"), reader.GetString("producers"), reader.GetString("winner"));
-                            return movie;
+
+                            MoviesModel movie = new MoviesModel(reader.GetInt32("year"), reader.GetString("title"), reader.GetString("studio"), reader.GetString("producers"), reader.GetString("winner"));
+                            movieList.Add(movie);
                         }
                         reader.Close();
                     }
                     _connection.Close();
+                    return movieList;
                 }
-                return null;
             }
             catch (Exception)
             {
-                return null;
+
+                return new List<MoviesModel>(); ;
             }
         }
 
