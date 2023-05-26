@@ -1,6 +1,4 @@
 using TextoIt.API.GoldenRaspberryAwards;
-using TextoIt.API.GoldenRaspberryAwards.Models;
-using TextoIt.API.GoldenRaspberryAwards.Repository;
 
 var builder = WebApplication.CreateBuilder(args);
 CustomStartup customStartUp = new CustomStartup();

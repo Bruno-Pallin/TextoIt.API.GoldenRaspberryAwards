@@ -1,95 +1,96 @@
 ﻿using Microsoft.Data.Sqlite;
 using Microsoft.VisualBasic.FileIO;
 using TextoIt.API.GoldenRaspberryAwards.Models;
+using TextoIt.API.GoldenRaspberryAwards.Repository;
 
 namespace TextoIt.API.GoldenRaspberryAwards
 {
     public class CustomStartup
     {
-        private string _dbFilePath;
-        public CustomStartup()
-        {
-            string dbFilePath = Path.Combine(Path.GetTempPath(), "MoviesDB.db");
-            _dbFilePath = dbFilePath;
-            File.Delete(_dbFilePath);
-        }
+        public CustomStartup() { }
 
         public void StartUp()
         {
-            List<MoviesModel> rows = ReadCSVFile();
-            CreateDB(rows, _dbFilePath);
+            string? dbFilePath = System.Environment.GetEnvironmentVariable("DBFilePath");
+            string? csvFilePath = System.Environment.GetEnvironmentVariable("CSVFilePath");
+
+            if (dbFilePath == null) throw new NullReferenceException("Please, configure the DBFilePath in launchSettings.json");
+            if (csvFilePath == null) throw new NullReferenceException("Please, configure the CSVFilePath in launchSettings.json");
+
+            List<MoviesModel> rows = ReadCSVFile(csvFilePath);
+            CreateDB(dbFilePath);
+            InsertRowsInDB(rows, dbFilePath);
         }
 
-        public List<MoviesModel> ReadCSVFile()
+        private List<MoviesModel> ReadCSVFile(string csvFilePath)
         {
-            using (var parser = new TextFieldParser("./CSVFile/MovieList.csv"))
+            try
             {
-                parser.TextFieldType = FieldType.Delimited;
-                parser.SetDelimiters(";");
-
-                List<MoviesModel> records = new List<MoviesModel>();
-
-                if (parser.ReadFields() != null)
+                using (var parser = new TextFieldParser(csvFilePath))
                 {
-                    while (!parser.EndOfData)
+                    parser.TextFieldType = FieldType.Delimited;
+                    parser.SetDelimiters(";");
+
+                    List<MoviesModel> rows = new List<MoviesModel>();
+
+                    if (parser.ReadFields() != null)
                     {
-                        var fields = parser.ReadFields();
-                        if (fields != null)
+                        while (!parser.EndOfData)
                         {
-                            var objeto = new MoviesModel
+                            var fields = parser.ReadFields();
+                            if (fields != null)
                             {
-                                year = fields[0],
-                                title = fields[1],
-                                studio = fields[2],
-                                producers = fields[3],
-                                winner = fields[4]
-                            };
-                            records.Add(objeto);
+                                int year = Convert.ToInt32(fields[0]);
+                                string title = fields[1];
+                                string studio = fields[2];
+                                string producers = fields[3];
+                                string winner = fields[4];
+                                MoviesModel movie = new MoviesModel(year, title, studio, producers, winner);
+                                rows.Add(movie);
+                            }
                         }
                     }
+                    return rows;
                 }
-                return records;
+            }
+            catch (Exception e)
+            {
+                throw new Exception(e.Message);
             }
         }
 
-        public void CreateDB(List<MoviesModel> rows, string dbFilePath)
+        private void CreateDB(string dbFilePath)
         {
-            SQLitePCL.Batteries.Init();
-            using (var connection = new SqliteConnection($"Data Source={dbFilePath}"))
+            try
             {
-                connection.Open();
+                File.Delete(dbFilePath);
 
-                using (var command = connection.CreateCommand())
+                SQLitePCL.Batteries.Init();
+                using (var connection = new SqliteConnection($"Data Source={dbFilePath}"))
                 {
-                    command.CommandText = "CREATE TABLE IF NOT EXISTS MoviesGoldenRaspberryAwards (year INTEGER , title TEXT, studio TEXT, producers TEXT, winner BOOLEAN, PRIMARY KEY (year, title))";
+                    connection.Open();
 
-                    command.ExecuteNonQuery();
-                }
-
-                foreach (var row in rows)
-                {
-                    try
+                    using (var command = connection.CreateCommand())
                     {
-                        using (var command = connection.CreateCommand())
-                        {
-                            command.CommandText = "INSERT INTO MoviesGoldenRaspberryAwards (year, title, studio, producers, winner) VALUES (@year, @title, @studio, @producers, @winner)";
+                        command.CommandText = "CREATE TABLE IF NOT EXISTS MoviesGoldenRaspberryAwards (year INTEGER , title TEXT, studio TEXT, producers TEXT, winner TEXT, PRIMARY KEY (year, title))";
 
-                            command.Parameters.AddWithValue("@year", row.year);
-                            command.Parameters.AddWithValue("@title", row.title);
-                            command.Parameters.AddWithValue("@studio", row.studio);
-                            command.Parameters.AddWithValue("@producers", row.producers);
-                            bool winner = row.winner == "yes" ? true : false;
-                            command.Parameters.AddWithValue("@winner", winner);
-
-                            command.ExecuteNonQuery();
-                        }
+                        command.ExecuteNonQuery();
                     }
-                    catch (Exception e)
-                    {
-                        if (!e.Message.Contains("SQLite Error 19")) throw;
-                    }
+                    connection.Close();
                 }
-                connection.Close();
+            }
+            catch (Exception e)
+            {
+                throw new Exception(e.Message);
+            }
+        }
+
+        private void InsertRowsInDB(List<MoviesModel> rows, string dbFilePath)
+        {
+            MoviesDAO moviesDAO = new MoviesDAO(dbFilePath);
+            foreach (var row in rows)
+            {
+                moviesDAO.Create(row);
             }
         }
     }
