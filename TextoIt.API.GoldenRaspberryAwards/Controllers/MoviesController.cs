@@ -33,6 +33,10 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
         {
             try
             {
+                if (movie.year < 1850 ||
+                    String.IsNullOrEmpty(movie.title))
+                    return BadRequest("Please, to update a movie, you need to fill the mandatory fields: year (higher than 1850) and title.");
+
                 string selectQuery = $"SELECT * FROM MoviesGoldenRaspberryAwards WHERE year={movie.year} AND title='{movie.title}'";
                 MoviesModel? movieReturned = _moviesDAO.Read(selectQuery);
 
@@ -59,7 +63,7 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
                     String.IsNullOrEmpty(movie.studio) ||
                     movie.winner == null &&
                     (movie.winner != "yes" && movie.winner != ""))
-                    return BadRequest("Please, to create a movie, you need to fill the fields: year, title, studio, producers and winner. \n winner can only be 'yes' or empty ''");
+                    return BadRequest("Please, to create a movie, you need to fill the fields: year (need to be greather than 1850), title, studio, producers and winner. \n winner can only be 'yes' or empty ''");
 
                 int httpReturnStatus = _moviesDAO.Create(movie);
 
