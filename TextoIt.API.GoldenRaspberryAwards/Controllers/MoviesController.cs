@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using TextoIt.API.GoldenRaspberryAwards.Models;
+using TextoIt.API.GoldenRaspberryAwards.Repository;
 
 namespace TextoIt.API.GoldenRaspberryAwards.Controllers
 {
@@ -8,50 +9,148 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
     public class MoviesController : ControllerBase
     {
         private readonly ILogger<MoviesModel> _logger;
+        private readonly MoviesDAO _moviesDAO;
 
         public MoviesController(ILogger<MoviesModel> logger)
         {
             _logger = logger;
+            string? dbFilePath = System.Environment.GetEnvironmentVariable("DBFilePath");
+            if (dbFilePath == null) throw new NullReferenceException("Please, configure the DBFilePath in launchSettings.json");
+            _moviesDAO = new MoviesDAO(dbFilePath);
         }
 
         [HttpGet]
-        [Produces("application/json")]
+        [Route("GreaterAndSmallestWinRange")]
         [Consumes("application/json")]
-        public string GetData()
+        public string GetWorstMovies()
         {
-            return "TestGet";
+            return "Teste";
+        }
+
+        [HttpGet]
+        [Consumes("application/json")]
+        public IActionResult GetMovie([FromBody] MoviesModel movie)
+        {
+            try
+            {
+                string selectQuery = $"SELECT * FROM MoviesGoldenRaspberryAwards WHERE year={movie.year} AND title='{movie.title}'";
+                MoviesModel? movieReturned = _moviesDAO.Read(selectQuery);
+
+                IActionResult response = Ok(movieReturned);
+                if (movieReturned == null) response = NotFound($"Movie not found in database.");
+
+                return response;
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Internal server error.");
+            }
         }
 
         [HttpPost]
-        [Produces("application/json")]
         [Consumes("application/json")]
-        public string CreateData()
+        public IActionResult CreateMovie([FromBody] MoviesModel movie)
         {
-            return "TestPost";
+            try
+            {
+                if (movie.year < 1850 ||
+                    String.IsNullOrEmpty(movie.title) ||
+                    String.IsNullOrEmpty(movie.producers) ||
+                    String.IsNullOrEmpty(movie.studio) ||
+                    movie.winner == null &&
+                    (movie.winner != "yes" && movie.winner != ""))
+                    return BadRequest("Please, to create a movie, you need to fill the fields: year, title, studio, producers and winner. \n winner can only be 'yes' or empty ''");
+
+                int httpReturnStatus = _moviesDAO.Create(movie);
+
+                IActionResult response = Created("MoviesDB", movie);
+
+                if (httpReturnStatus == 409) response = Conflict($"Movie already exists in database.");
+
+                return response;
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Internal server error.");
+            }
         }
 
         [HttpPut]
-        [Produces("application/json")]
         [Consumes("application/json")]
-        public string UpdateData()
+        public IActionResult UpdateMovie([FromBody] MoviesModel movie)
         {
-            return "TestPut";
+            try
+            {
+                if (movie.year < 1850 ||
+                    String.IsNullOrEmpty(movie.title) ||
+                    String.IsNullOrEmpty(movie.producers) ||
+                    String.IsNullOrEmpty(movie.studio) ||
+                    movie.winner == null &&
+                    (movie.winner != "yes" && movie.winner != ""))
+                    return BadRequest("Please, to update a movie, you need to fill the fields: year (need to be higher than 1850), title, studio, producers and winner. \n winner can only be 'yes' or empty ''");
+
+                int httpReturnStatus = _moviesDAO.Update(movie);
+
+                IActionResult response = NoContent();
+                if (httpReturnStatus == 404) response = NotFound($"Movie not found in database.");
+
+                return response;
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Internal server error.");
+            }
         }
 
         [HttpPatch]
-        [Produces("application/json")]
         [Consumes("application/json")]
-        public string UpdatePartialData()
+        public IActionResult UpdatePartialMovie([FromBody] MoviesModel movie)
         {
-            return "TestePatch";
+            try
+            {
+                if (movie.year < 1850 ||
+                    String.IsNullOrEmpty(movie.title))
+                    return BadRequest("Please, to update a movie, you need to fill the mandatory fields: year (higher than 1850) and title.");
+
+                if (String.IsNullOrEmpty(movie.studio) &&
+                    String.IsNullOrEmpty(movie.producers) &&
+                    movie.winner == null)
+                    return BadRequest("Please, to update a movie, you need to fill at least one optional field: studio, producers or winner.");
+
+                int httpReturnStatus = _moviesDAO.Update(movie);
+
+                if (httpReturnStatus == 404) return NotFound($"Movie not found in database.");
+
+                string selectQuery = $"SELECT * FROM MoviesGoldenRaspberryAwards WHERE year={movie.year} AND title='{movie.title}'";
+                MoviesModel? movieUpdated = _moviesDAO.Read(selectQuery);
+                return Ok(movieUpdated);
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Internal server error.");
+            }
         }
 
         [HttpDelete]
-        [Produces("application/json")]
         [Consumes("application/json")]
-        public string DeleteData()
+        public IActionResult DeleteMovie([FromBody] MoviesModel movie)
         {
-            return "TestDelete";
+            try
+            {
+                if (movie.year < 1850 ||
+                    String.IsNullOrEmpty(movie.title))
+                    return BadRequest("Please, to update a movie, you need to fill the mandatory fields: year (higher than 1850) and title.");
+
+                int httpReturnStatus = _moviesDAO.Delete(movie.year, movie.title);
+
+                IActionResult response = NoContent();
+                if (httpReturnStatus == 404) response = NotFound($"Movie not found in database.");
+                return response;
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Internal server error.");
+            }
         }
     }
 }
