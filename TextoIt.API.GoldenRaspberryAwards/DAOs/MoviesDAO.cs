@@ -9,9 +9,11 @@ namespace TextoIt.API.GoldenRaspberryAwards.Repository
     public class MoviesDAO
     {
         private SqliteConnection _connection;
-        public MoviesDAO(string dbFilePath)
+        public readonly string dbName;
+        public MoviesDAO(string dbFilePath, string dbName)
         {
             _connection = new SqliteConnection($"Data Source={dbFilePath}");
+            this.dbName = dbName; ;
         }
         public int Create(MoviesModel movie)
         {
@@ -22,7 +24,15 @@ namespace TextoIt.API.GoldenRaspberryAwards.Repository
                     _connection.Open();
                     using (SqliteCommand command = _connection.CreateCommand())
                     {
-                        command.CommandText = $"INSERT INTO MoviesGoldenRaspberryAwards (year, title, studio, producers, winner) VALUES ({movie.year}, '{movie.title}', '{movie.studio}', '{movie.producers}', '{movie.winner}')";
+                        string sqlQuery = string.Format(
+                            "INSERT INTO {0} (year, title, studio, producers, winner) VALUES ({1}, \"{2}\", \"{3}\", \"{4}\", \"{5}\")",
+                            this.dbName,
+                            movie.year,
+                            movie.title,
+                            movie.studio,
+                            movie.producers,
+                            movie.winner);
+                        command.CommandText = sqlQuery;
                         command.ExecuteNonQuery();
                     }
                     _connection.Close();
@@ -104,7 +114,7 @@ namespace TextoIt.API.GoldenRaspberryAwards.Repository
         {
             try
             {
-                string deleteQuery = $"DELETE FROM MoviesGoldenRaspberryAwards WHERE year={year} AND title='{title}'";
+                string deleteQuery = string.Format("DELETE FROM {0} WHERE year={1} AND title=\"{2}\"", this.dbName, year, title);
 
                 using (_connection)
                 {
@@ -129,7 +139,7 @@ namespace TextoIt.API.GoldenRaspberryAwards.Repository
 
         private string ConstructUpdateQuery(MoviesModel movie)
         {
-            var sqlQuery = "UPDATE MoviesGoldenRaspberryAwards SET";
+            var sqlQuery = string.Format("UPDATE {0} SET", this.dbName);
 
             IEnumerable<PropertyInfo>? propertieMovieInfo = movie.GetType().GetProperties().Where(p => !p.GetGetMethod().GetParameters().Any());
 
@@ -140,13 +150,13 @@ namespace TextoIt.API.GoldenRaspberryAwards.Repository
                 if (property != null && property.Name != "year" && property.Name != "title" && propertyValue != null)
                 {
                     Type propertyType = propertyValue.GetType();
-                    string singleQuoteWhenPropertyIsString = propertyType.Name == "String" ? "'" : "";
-                    sqlQuery += $" {property.Name}={singleQuoteWhenPropertyIsString + propertyValue + singleQuoteWhenPropertyIsString},";
+                    string QuoteWhenPropertyIsString = propertyType.Name == "String" ? "\"" : "";
+                    sqlQuery += $" {property.Name}={QuoteWhenPropertyIsString + propertyValue + QuoteWhenPropertyIsString},";
                 }
             }
 
             sqlQuery = sqlQuery.Substring(0, sqlQuery.Length - 1);
-            sqlQuery += $" WHERE year={movie.year} AND title='{movie.title}'";
+            sqlQuery += $" WHERE year={movie.year} AND title=\"{movie.title}\"";
 
             return sqlQuery;
         }
