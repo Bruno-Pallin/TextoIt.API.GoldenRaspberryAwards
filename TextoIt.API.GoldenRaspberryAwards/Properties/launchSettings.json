@@ -18,7 +18,8 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development",
         "DBFilePath": "./Files/MoviesDB.db",
-        "CSVFilePath": "./Files/MovieList.csv"
+        "CSVFilePath": "./Files/MovieList.csv",
+        "DBName": "MoviesGoldenRaspberryAwards"
       }
     },
     "IIS Express": {

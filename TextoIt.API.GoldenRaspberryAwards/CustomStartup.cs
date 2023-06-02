@@ -13,13 +13,15 @@ namespace TextoIt.API.GoldenRaspberryAwards
         {
             string? dbFilePath = System.Environment.GetEnvironmentVariable("DBFilePath");
             string? csvFilePath = System.Environment.GetEnvironmentVariable("CSVFilePath");
-
+            string? dbName = System.Environment.GetEnvironmentVariable("DBName");
+            
             if (dbFilePath == null) throw new NullReferenceException("Please, configure the DBFilePath in launchSettings.json");
             if (csvFilePath == null) throw new NullReferenceException("Please, configure the CSVFilePath in launchSettings.json");
+            if (dbName == null) throw new NullReferenceException("Please, configure the DBName in launchSettings.json");
 
             List<MoviesModel> rows = ReadCSVFile(csvFilePath);
-            CreateDB(dbFilePath);
-            InsertRowsInDB(rows, dbFilePath);
+            CreateDB(dbFilePath, dbName);
+            InsertRowsInDB(rows, dbFilePath, dbName);
         }
 
         private List<MoviesModel> ReadCSVFile(string csvFilePath)
@@ -59,7 +61,7 @@ namespace TextoIt.API.GoldenRaspberryAwards
             }
         }
 
-        private void CreateDB(string dbFilePath)
+        private void CreateDB(string dbFilePath, string dbName)
         {
             try
             {
@@ -72,7 +74,7 @@ namespace TextoIt.API.GoldenRaspberryAwards
 
                     using (var command = connection.CreateCommand())
                     {
-                        command.CommandText = "CREATE TABLE IF NOT EXISTS MoviesGoldenRaspberryAwards (year INTEGER , title TEXT, studio TEXT, producers TEXT, winner TEXT, PRIMARY KEY (year, title))";
+                        command.CommandText = string.Format("CREATE TABLE IF NOT EXISTS {0} (year INTEGER , title TEXT, studio TEXT, producers TEXT, winner TEXT, PRIMARY KEY (year, title))", dbName);
 
                         command.ExecuteNonQuery();
                     }
@@ -85,9 +87,9 @@ namespace TextoIt.API.GoldenRaspberryAwards
             }
         }
 
-        private void InsertRowsInDB(List<MoviesModel> rows, string dbFilePath)
+        private void InsertRowsInDB(List<MoviesModel> rows, string dbFilePath, string dbName)
         {
-            MoviesDAO moviesDAO = new MoviesDAO(dbFilePath);
+            MoviesDAO moviesDAO = new MoviesDAO(dbFilePath, dbName);
             foreach (var row in rows)
             {
                 moviesDAO.Create(row);
