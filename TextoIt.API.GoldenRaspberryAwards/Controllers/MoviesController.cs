@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using TextoIt.API.GoldenRaspberryAwards.Models;
 using TextoIt.API.GoldenRaspberryAwards.Repository;
 
@@ -11,12 +12,16 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
         private readonly ILogger<MoviesModel> _logger;
         private readonly MoviesDAO _moviesDAO;
 
+
         public MoviesController(ILogger<MoviesModel> logger)
         {
             _logger = logger;
             string? dbFilePath = System.Environment.GetEnvironmentVariable("DBFilePath");
+            string? dbName = System.Environment.GetEnvironmentVariable("DBName");
             if (dbFilePath == null) throw new NullReferenceException("Please, configure the DBFilePath in launchSettings.json");
-            _moviesDAO = new MoviesDAO(dbFilePath);
+            if (dbName == null) throw new NullReferenceException("Please, configure the DBName in launchSettings.json");
+
+            _moviesDAO = new MoviesDAO(dbFilePath, dbName);
         }
 
         [HttpGet]
@@ -24,20 +29,74 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
         [Consumes("application/json")]
         public string GetWorstMovies()
         {
+            string sqlGetQuery = string.Format("SELECT * FROM {0} WHERE winner=\"yes\" ORDER BY year ASC", _moviesDAO.dbName);
+            List<MoviesModel> winnerMoviesList = _moviesDAO.Read(sqlGetQuery);
+            List<string> producersList = new List<string>();
+
+            foreach (MoviesModel movie in winnerMoviesList)
+            {
+                if (movie.producers != null)
+                {
+                    string[] delimiters = new[] { ",", "and" };
+                    string[] producers = movie.producers.Split(delimiters, StringSplitOptions.RemoveEmptyEntries);
+                    foreach (string producer in producers)
+                    {
+                        if (!producersList.Contains(producer.Trim())) producersList.Add(producer.Trim());
+                    }
+                }
+            }
             return "Teste";
         }
 
+
         [HttpGet]
-        [Consumes("application/json")]
-        public IActionResult GetMovie([FromBody] MoviesModel movie)
+        [Route("GetAllMovies")]
+        [Produces("application/json")]
+        public IActionResult GetAllMovies()
         {
             try
             {
-                if (movie.year < 1850 ||
-                    String.IsNullOrEmpty(movie.title))
+                string selectQuery;
+
+                selectQuery = string.Format("SELECT * FROM {0}", _moviesDAO.dbName);
+
+                List<MoviesModel> movieReturned = _moviesDAO.Read(selectQuery);
+
+                IActionResult response;
+                if (movieReturned.Count > 0)
+                {
+                    response = Ok(JsonConvert.SerializeObject(movieReturned));
+                }
+                else
+                {
+                    response = NotFound($"Movie not found in database.");
+                }
+
+                return response;
+            }
+            catch (Exception)
+            {
+                return StatusCode(500, "Internal server error.");
+            }
+        }
+
+        [HttpGet]
+        [Route("GetMovie")]
+        [Produces("application/json")]
+        public IActionResult GetMovie()
+        {
+            try
+            {
+                int? year = Int32.Parse(Request.Query["year"]);
+                string? title = Request.Query["title"];
+                string selectQuery;
+
+                if (year < 1850 ||
+                    String.IsNullOrEmpty(title))
                     return BadRequest("Please, to update a movie, you need to fill the mandatory fields: year (higher than 1850) and title.");
 
-                string selectQuery = $"SELECT * FROM MoviesGoldenRaspberryAwards WHERE year={movie.year} AND title='{movie.title}'";
+                selectQuery = string.Format("SELECT * FROM {0} WHERE year={1} AND title=\"{2}\"", _moviesDAO.dbName, year, title);
+
                 List<MoviesModel> movieReturned = _moviesDAO.Read(selectQuery);
 
                 IActionResult response;
@@ -59,6 +118,7 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
         }
 
         [HttpPost]
+        [Route("CreateMovie")]
         [Consumes("application/json")]
         public IActionResult CreateMovie([FromBody] MoviesModel movie)
         {
@@ -74,9 +134,10 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
 
                 int httpReturnStatus = _moviesDAO.Create(movie);
 
-                IActionResult response = Created("MoviesDB", movie);
+                IActionResult response = StatusCode(201);
 
                 if (httpReturnStatus == 409) response = Conflict($"Movie already exists in database.");
+                if (httpReturnStatus == 500) response = StatusCode(500, "Internal server error.");
 
                 return response;
             }
@@ -87,6 +148,7 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
         }
 
         [HttpPut]
+        [Route("UpdateMovie")]
         [Consumes("application/json")]
         public IActionResult UpdateMovie([FromBody] MoviesModel movie)
         {
@@ -104,6 +166,7 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
 
                 IActionResult response = NoContent();
                 if (httpReturnStatus == 404) response = NotFound($"Movie not found in database.");
+                if (httpReturnStatus == 500) response = StatusCode(500, "Internal server error.");
 
                 return response;
             }
@@ -114,6 +177,7 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
         }
 
         [HttpPatch]
+        [Route("UpdatePartialMovie")]
         [Consumes("application/json")]
         public IActionResult UpdatePartialMovie([FromBody] MoviesModel movie)
         {
@@ -131,8 +195,9 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
                 int httpReturnStatus = _moviesDAO.Update(movie);
 
                 if (httpReturnStatus == 404) return NotFound($"Movie not found in database.");
+                if (httpReturnStatus == 500) return StatusCode(500, "Internal server error.");
 
-                string selectQuery = $"SELECT * FROM MoviesGoldenRaspberryAwards WHERE year={movie.year} AND title='{movie.title}'";
+                string selectQuery = string.Format("SELECT * FROM {0} WHERE year={1} AND title=\"{2}\"", _moviesDAO.dbName, movie.year, movie.title);
                 List<MoviesModel> movieUpdated = _moviesDAO.Read(selectQuery);
                 return Ok(movieUpdated[0]);
             }
@@ -143,6 +208,7 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
         }
 
         [HttpDelete]
+        [Route("DeleteMovie")]
         [Consumes("application/json")]
         public IActionResult DeleteMovie([FromBody] MoviesModel movie)
         {
@@ -156,6 +222,7 @@ namespace TextoIt.API.GoldenRaspberryAwards.Controllers
 
                 IActionResult response = NoContent();
                 if (httpReturnStatus == 404) response = NotFound($"Movie not found in database.");
+                if (httpReturnStatus == 500) response = StatusCode(500, "Internal server error.");
                 return response;
             }
             catch (Exception)
